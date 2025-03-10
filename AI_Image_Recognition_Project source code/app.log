@@ -1,0 +1,2 @@
+2025-03-09 15:31:16,880 - __main__ - ERROR - Missing required environment variable: AWS_ACCESS_KEY_ID
+2025-03-09 15:35:02,965 - __main__ - ERROR - Missing required environment variable: AWS_ACCESS_KEY_ID

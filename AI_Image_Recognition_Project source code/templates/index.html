@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Recognition App</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: url('/static/bgs.jpg') no-repeat center fixed ;
+            background-size: cover;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #e0e0e0;
+            transition: background-image 0.5s ease-in-out;
+        }
+
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 1;
+            transition: opacity 0.5s ease-in-out;
+        }
+
+        #loading-overlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .loader {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #fff;
+            border-top: 5px solid #fc9506;
+            border-radius: 50%;
+            animation: spin 1s linear infinite, pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(235, 174, 21, 0.5); }
+            50% { box-shadow: 0 0 10px 5px rgba(236, 125, 15, 0.999); }
+            100% { box-shadow: 0 0 0 0 rgba(246, 131, 0, 0.915); }
+        }
+
+        .container {
+            display: flex;
+            max-width: 935px;
+            width: 100%;
+            margin: 20px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .content-section {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.378);
+            padding: 40px;
+            border: 1px solid #dbdbdb;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            max-width: 350px;
+            transition: transform 0.3s ease;
+        }
+
+        .container.logged-in .content-section {
+            max-width: 100%;
+            width: 100%;
+        }
+
+        .content-section:hover {
+            transform: translateY(-2px);
+        }
+
+        h1 {
+            text-align: center;
+            color: #262626; 
+            font-size: 28px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        h2 {
+            color: #070505;
+            font-size: 16px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        input, select {
+            padding: 12px;
+            font-size: 14px;
+            border: 1px solid #dbdbdb;
+            border-radius: 4px;
+            background: #fafafa;
+            font-weight: 300;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #0095f6;
+            box-shadow: 0 0 0 2px rgba(0,149,246,0.2);
+        }
+
+        input:invalid {
+            border-color: #ed4956;
+        }
+
+        input[type="file"] {
+            border: 1px solid #e1e8ed;
+            padding: 10px;
+            background: #fafafa;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        button {
+            padding: 12px;
+            font-size: 14px;
+            background-color: #f66f00;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease-in-out;
+            box-shadow: 0 4px 12px rgba(246, 164, 0, 0.766);
+        }
+
+        button:hover:not(.loading) {
+            background-color: #e7920a;
+            transform: scale(1.05);
+            box-shadow: 0 6px 16px rgba(238, 163, 12, 0.805);
+        }
+
+        button.loading {
+            background-color: #f39405;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        button.loading::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            top: 50%;
+            right: 15px;
+            transform: translateY(-50%);
+            border: 3px solid #fff;
+            border-top: 3px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .error-message {
+            color: #ed4956;
+            font-size: 14px;
+            text-align: center;
+            margin: 10px 0;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        #analyze-results, #results-list {
+            margin-top: 20px;
+            padding: 15px;
+            background: #fff;
+            border: 1px solid #dbdbdb;
+            border-radius: 4px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .result-card {
+            padding: 15px;
+            background: #fff;
+            border-radius: 4px;
+            border: 1px solid #f9b413e1;
+            margin: 10px 0;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .result-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        #show-signup{
+            color: #464139cb;
+
+        }
+
+        .celebrity-name {
+            color: #0095f6;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .confidence-level {
+            color: #2ecc71;
+            font-weight: bold;
+        }
+
+        .result-title {
+            color: #262626;
+            font-size: 16px;
+            font-weight: 600;
+            margin: 0 0 10px 0;
+        }
+
+        .text-full, .object-labels, .text-items {
+            background: #fafafa;
+            padding: 10px 15px;
+            border-radius: 4px;
+            color: #333;
+            font-size: 14px;
+            margin-bottom: 15px;
+            border-left: 3px solid #0095f6;
+        }
+
+        .toggle-link {
+            color: #0095f6;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+            text-align: center;
+            display: block;
+            margin-top: 15px;
+        }
+
+        .toggle-link:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+                margin: 10px;
+            }
+            .content-section {
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="loading-overlay">
+        <div class="loader"></div>
+    </div>
+
+    <div class="container" id="main-container">
+        <div class="content-section">
+            <h1>Image Recognition</h1>
+
+            <div id="signup-section" class="hidden">
+                <h2>Sign Up</h2>
+                <form id="signup-form" novalidate>
+                    <input type="text" id="signup-username" placeholder="Username" required pattern="[A-Za-z0-9]{3,20}">
+                    <input type="password" id="signup-password" placeholder="Password" required minlength="6">
+                    <button type="submit">Sign Up</button>
+                </form>
+                <p id="signup-message"></p>
+                <a href="#" id="show-login" class="toggle-link">Already have an account? Log in</a>
+            </div>
+
+            <div id="login-section">
+                <h2>Login</h2>
+                <form id="login-form" novalidate>
+                    <input type="text" id="login-username" placeholder="Username" required pattern="[A-Za-z0-9]{3,20}">
+                    <input type="password" id="login-password" placeholder="Password" required minlength="6">
+                    <button type="submit">Login</button>
+                </form>
+                <p id="login-message"></p>
+                <a href="#" id="show-signup" class="toggle-link">Don’t have an account? Sign up</a>
+            </div>
+
+            <div id="analysis-section" class="hidden">
+                <h2>Analyze Image</h2>
+                <form id="analyze-form" enctype="multipart/form-data">
+                    <input type="file" id="image-input" accept="image/png,image/jpeg,image/jpg" required>
+                    <select id="detection-type">
+                        <option value="object">Object Detection</option>
+                        <option value="text">Text Detection</option>
+                        <option value="celebrity">Celebrity Detection</option>
+                    </select>
+                    <button type="submit" id="analyze-btn">Analyze</button>
+                </form>
+                <p id="analyze-message"></p>
+                <div id="analyze-results"></div>
+            </div>
+
+            <div id="results-section" class="hidden">
+                <h2>Your Previous Results</h2>
+                <button id="fetch-results">Fetch Results</button>
+                <div id="results-list"></div>
+            </div>
+
+            <button id="logout-btn" class="hidden">Logout</button>
+        </div>
+    </div>
+
+    <script>
+        // Token management
+        const getToken = () => localStorage.getItem('authToken');
+        const setToken = (token) => localStorage.setItem('authToken', token);
+        const clearToken = () => localStorage.removeItem('authToken');
+
+        // Initialize UI based on token presence
+        window.addEventListener('load', () => {
+            document.getElementById('loading-overlay').classList.add('hidden');
+            if (getToken()) {
+                showLoggedInUI();
+            }
+        });
+
+        // Background image fallback
+        document.addEventListener('DOMContentLoaded', () => {
+            const img = new Image();
+            img.src = '/static/images/bgs.jpg';
+            img.onerror = () => {
+                document.body.style.backgroundImage = "url('https://images.pexels.com/photos/355948/pexels-photo-355948.jpeg')";
+            };
+        });
+
+        // Utility function to reconstruct text
+        function reconstructText(textArray) {
+            return textArray.join(' ').replace(/\s+/g, ' ').trim();
+        }
+
+        // Toggle between login and signup
+        document.getElementById('show-signup').addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('login-section').classList.add('hidden');
+            document.getElementById('signup-section').classList.remove('hidden');
+        });
+
+        document.getElementById('show-login').addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('signup-section').classList.add('hidden');
+            document.getElementById('login-section').classList.remove('hidden');
+        });
+
+        // Signup handler
+        document.getElementById('signup-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('signup-username').value;
+            const password = document.getElementById('signup-password').value;
+            const message = document.getElementById('signup-message');
+            const loadingOverlay = document.getElementById('loading-overlay');
+
+            if (!username.match(/[A-Za-z0-9]{3,20}/) || password.length < 6) {
+                message.textContent = 'Username must be 3-20 alphanumeric characters, password 6+ characters';
+                message.className = 'error-message';
+                return;
+            }
+
+            loadingOverlay.classList.remove('hidden');
+            try {
+                const response = await fetch('/sign-up', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await response.json();
+
+                if (!response.ok) {
+                    message.textContent = data.error || 'Signup failed';
+                    message.className = 'error-message';
+                } else {
+                    message.textContent = data.message;
+                    message.style.color = 'green';
+                    setToken(data.token); // Store token from signup
+                    showLoggedInUI();
+                }
+            } catch (error) {
+                message.textContent = 'Network error during signup';
+                message.className = 'error-message';
+                console.error('Signup error:', error);
+            } finally {
+                loadingOverlay.classList.add('hidden');
+            }
+        });
+
+        // Login handler
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+            const message = document.getElementById('login-message');
+            const loadingOverlay = document.getElementById('loading-overlay');
+
+            if (!username.match(/[A-Za-z0-9]{3,20}/) || password.length < 6) {
+                message.textContent = 'Invalid username or password format';
+                message.className = 'error-message';
+                return;
+            }
+
+            loadingOverlay.classList.remove('hidden');
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await response.json();
+
+                if (!response.ok) {
+                    message.textContent = data.error || 'Login failed';
+                    message.className = 'error-message';
+                } else {
+                    message.textContent = data.message;
+                    message.style.color = 'green';
+                    setToken(data.token);
+                    showLoggedInUI();
+                }
+            } catch (error) {
+                message.textContent = 'Network error during login';
+                message.className = 'error-message';
+                console.error('Login error:', error);
+            } finally {
+                loadingOverlay.classList.add('hidden');
+            }
+        });
+
+        // Analyze image handler
+        document.getElementById('analyze-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const imageInput = document.getElementById('image-input');
+            const detectionType = document.getElementById('detection-type').value;
+            const message = document.getElementById('analyze-message');
+            const resultsDiv = document.getElementById('analyze-results');
+            const analyzeBtn = document.getElementById('analyze-btn');
+            const token = getToken();
+
+            if (!token) {
+                message.textContent = 'Please log in to analyze images';
+                message.className = 'error-message';
+                showLoggedOutUI();
+                return;
+            }
+
+            if (!imageInput.files[0]) {
+                message.textContent = 'Please select an image';
+                message.className = 'error-message';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('image', imageInput.files[0]);
+            formData.append('detection_type', detectionType);
+
+            analyzeBtn.classList.add('loading');
+            analyzeBtn.textContent = 'Analyzing';
+            message.textContent = '';
+
+            try {
+                const response = await fetch('/analyze-image', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        message.textContent = 'Session expired. Please log in again.';
+                        clearToken();
+                        showLoggedOutUI();
+                    } else {
+                        message.textContent = data.error || 'Analysis failed';
+                    }
+                    message.className = 'error-message';
+                    resultsDiv.innerHTML = '';
+                } else {
+                    message.textContent = data.message;
+                    message.style.color = 'green';
+
+                    if (detectionType === 'celebrity' && data.results.celebrities) {
+                        resultsDiv.innerHTML = data.results.celebrities.map(celeb => `
+                            <div class="result-card">
+                                <h3 class="result-title">Celebrity Detected</h3>
+                                <h3 class="celebrity-name">${celeb.name}</h3>
+                                <p>Confidence: <span class="confidence-level">${celeb.confidence.toFixed(2)}%</span></p>
+                            </div>
+                        `).join('');
+                    } else if (detectionType === 'text' && Array.isArray(data.results.text)) {
+                        const fullText = reconstructText(data.results.text);
+                        resultsDiv.innerHTML = `
+                            <div class="result-card">
+                                <h3 class="result-title">Detected Text</h3>
+                                <div class="text-full">${fullText}</div>
+                                <div class="text-items">
+                                    ${data.results.text.map(text => `<div>${text}</div>`).join('')}
+                                </div>
+                            </div>
+                        `;
+                    } else if (detectionType === 'object' && Array.isArray(data.results.labels)) {
+                        resultsDiv.innerHTML = `
+                            <div class="result-card">
+                                <h3 class="result-title">Detected Objects</h3>
+                                <div class="object-labels">
+                                    ${data.results.labels.map(label => `<div>${label}</div>`).join('')}
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+            } catch (error) {
+                message.textContent = 'Network error during analysis';
+                message.className = 'error-message';
+                resultsDiv.innerHTML = '';
+                console.error('Analysis error:', error);
+            } finally {
+                analyzeBtn.classList.remove('loading');
+                analyzeBtn.textContent = 'Analyze';
+            }
+        });
+
+        // Fetch results handler
+        document.getElementById('fetch-results').addEventListener('click', async () => {
+            const resultsList = document.getElementById('results-list');
+            const token = getToken();
+
+            if (!token) {
+                resultsList.innerHTML = '<p class="error-message">Please log in to view results</p>';
+                showLoggedOutUI();
+                return;
+            }
+
+            try {
+                const response = await fetch('/get-image-results', {
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        resultsList.innerHTML = '<p class="error-message">Session expired. Please log in again.</p>';
+                        clearToken();
+                        showLoggedOutUI();
+                    } else {
+                        resultsList.innerHTML = `<p class="error-message">${data.error || 'Failed to fetch results'}</p>`;
+                    }
+                } else {
+                    resultsList.innerHTML = data.results.map(item => {
+                        let resultsDisplay = '';
+                        if (item.image_results.celebrities) {
+                            resultsDisplay = item.image_results.celebrities.map(celeb => `
+                                <div class="result-card">
+                                    <h3 class="result-title">Celebrity Detected</h3>
+                                    <h3 class="celebrity-name">${celeb.name}</h3>
+                                    <p>Confidence: <span class="confidence-level">${celeb.confidence.toFixed(2)}%</span></p>
+                                </div>
+                            `).join('');
+                        } else if (Array.isArray(item.image_results.text)) {
+                            const fullText = reconstructText(item.image_results.text);
+                            resultsDisplay = `
+                                <div class="result-card">
+                                    <h3 class="result-title">Detected Text</h3>
+                                    <div class="text-full">${fullText}</div>
+                                    <div class="text-items">
+                                        ${item.image_results.text.map(text => `<div>${text}</div>`).join('')}
+                                    </div>
+                                </div>
+                            `;
+                        } else if (Array.isArray(item.image_results.labels)) {
+                            resultsDisplay = `
+                                <div class="result-card">
+                                    <h3 class="result-title">Detected Objects</h3>
+                                    <div class="object-labels">
+                                        ${item.image_results.labels.map(label => `<div>${label}</div>`).join('')}
+                                    </div>
+                                </div>
+                            `;
+                        }
+                        return `
+                            <div class="result-card">
+                                <p><strong>ID:</strong> ${item.user_answer_id}</p>
+                                <p><strong>Question:</strong> ${item.question_id}</p>
+                                <p><strong>Answer:</strong> ${item.submitted_answer}</p>
+                                <p><strong>Results:</strong></p>
+                                ${resultsDisplay}
+                                <p><strong>Timestamp:</strong> ${new Date(item.timestamp).toLocaleString()}</p>
+                            </div>
+                        `;
+                    }).join('') || '<p>No previous results found</p>';
+                }
+            } catch (error) {
+                resultsList.innerHTML = '<p class="error-message">Network error fetching results</p>';
+                console.error('Fetch results error:', error);
+            }
+        });
+
+        // Logout handler
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            clearToken();
+            showLoggedOutUI();
+            document.getElementById('login-section').classList.remove('hidden');
+        });
+
+        // UI state management
+        function showLoggedInUI() {
+            const container = document.getElementById('main-container');
+            container.classList.add('logged-in');
+            document.getElementById('signup-section').classList.add('hidden');
+            document.getElementById('login-section').classList.add('hidden');
+            document.getElementById('analysis-section').classList.remove('hidden');
+            document.getElementById('results-section').classList.remove('hidden');
+            document.getElementById('logout-btn').classList.remove('hidden');
+        }
+
+        function showLoggedOutUI() {
+            const container = document.getElementById('main-container');
+            container.classList.remove('logged-in');
+            document.getElementById('signup-section').classList.add('hidden');
+            document.getElementById('login-section').classList.remove('hidden');
+            document.getElementById('analysis-section').classList.add('hidden');
+            document.getElementById('results-section').classList.add('hidden');
+            document.getElementById('logout-btn').classList.add('hidden');
+            document.getElementById('signup-message').textContent = '';
+            document.getElementById('login-message').textContent = '';
+            document.getElementById('analyze-message').textContent = '';
+            document.getElementById('analyze-results').innerHTML = '';
+            document.getElementById('results-list').innerHTML = '';
+            document.getElementById('signup-form').reset();
+            document.getElementById('login-form').reset();
+            document.getElementById('analyze-form').reset();
+        }
+    </script>
+</body>
+</html>
